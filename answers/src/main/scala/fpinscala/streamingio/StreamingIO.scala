@@ -814,7 +814,7 @@ object GeneralizedStreamTransducers {
       zipWith(p2)((_,_))
 
     def to[O2](sink: Sink[F,O]): Process[F,Unit] = 
-      eval { (this zipWith sink)((o,f) => f(o)) }
+      sink flatMap (s => eval(this.map(s)))
 
     def through[O2](p2: Process[F, O => F[O2]]): Process[F,O2] = 
       eval { (this zipWith p2)((o,f) => f(o)) }
@@ -1076,7 +1076,7 @@ object GeneralizedStreamTransducers {
       resource(IO { new java.io.FileWriter(file, append) })(
                w => IO(w.close)) {
         w => IO { (s: String) => IO(w.write(s)) } 
-      }
+      }.once
 
     /* Exercise 9: Implement `eval`. */
 
@@ -1105,7 +1105,7 @@ object GeneralizedStreamTransducers {
     val converter: Process[IO,Unit] = 
       lines("fahrenheit.txt").
       filter(!_.startsWith("#")).
-      map(line => fahrenheitToCelsius(line.toDouble).toString).
+      map(line => fahrenheitToCelsius(line.toDouble).toString + "\n").
       to(fileW("celsius.txt")).
       drain
     
@@ -1154,11 +1154,11 @@ object GeneralizedStreamTransducers {
      */
 
     val convertAll: Process[IO,Unit] = (for {
-      out <- fileW("celsius.txt").once
+      out <- fileW("celsius.txt")
       file <- lines("fahrenheits.txt") 
       _ <- lines(file).
            map(line => fahrenheitToCelsius(line.toDouble)).
-           map(celsius => out(celsius.toString)).
+           map(celsius => out(celsius.toString + "\n")).
            eval // see definition of infix syntax above
     } yield ()) drain 
 
